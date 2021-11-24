@@ -5,7 +5,7 @@
 # include <cmath>
 # include <vector>
 # include <fstream>
-
+# include <mpi.h>
 
 /** Une structure complexe est définie pour la bonne raison que la classe
  * complex proposée par g++ est très lente ! Le calcul est bien plus rapide
@@ -106,6 +106,25 @@ computeMandelbrotSet( int W, int H, int maxIter )
     return pixels;
 }
 
+std::vector<int>
+computeMandelbrotSetFromTo( int from, int to, int W, int H, int maxIter )
+{
+    std::chrono::time_point<std::chrono::system_clock> start, end;
+    std::vector<int> pixels((to-from)*W);
+    start = std::chrono::system_clock::now();
+    // On parcourt les pixels de l'espace image :
+    for ( int i = from; i < to; ++i ) {
+      computeMandelbrotSetRow(W, H, maxIter, i, pixels.data() +((W*(i-from))));
+    }
+    end = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end-start;
+    std::cout << "Temps calcul ensemble mandelbrot : " << elapsed_seconds.count() 
+              << std::endl;
+    
+    return pixels;
+}
+
+
 /** Construit et sauvegarde l'image finale **/
 void savePicture( const std::string& filename, int W, int H, const std::vector<int>& nbIters, int maxIter )
 {
@@ -131,8 +150,34 @@ int main(int argc, char *argv[] )
     // ci--dessous :
     //const int maxIter = 16777216;
     const int maxIter = 8*65536;
-    auto iters = computeMandelbrotSet( W, H, maxIter );
-    savePicture("mandelbrot.tga", W, H, iters, maxIter);
+
+    std::vector<int> recvbuf;
+    std::vector<int> sendbuf;
+
+
+    MPI_Init( &argc, &argv );
+    MPI_Comm globComm;
+    MPI_Comm_dup(MPI_COMM_WORLD, &globComm);
+
+    int nbp;
+    int rank;
+    
+    MPI_Comm_size(globComm, &nbp);
+    MPI_Comm_rank(globComm, &rank);
+
+    if(rank==0)
+        recvbuf.resize(W*H);
+
+    sendbuf=computeMandelbrotSetFromTo(((rank)*H/nbp),((rank+1)*H)/nbp,W, H, maxIter);
+    
+    MPI_Gather(sendbuf.data(),sendbuf.size(),MPI_INT,recvbuf.data(),sendbuf.size(),MPI_INT,0,globComm);
+
+    
+    if(rank==0)
+        savePicture("mandelbrot.tga", W, H, recvbuf, maxIter);
+    
+    MPI_Finalize();
+
     return EXIT_SUCCESS;
  }
     
