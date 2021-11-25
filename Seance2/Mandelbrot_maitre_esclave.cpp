@@ -111,18 +111,12 @@ computeMandelbrotSet( int W, int H, int maxIter )
 std::vector<int>
 computeMandelbrotSetFromTo( int from, int to, int W, int H, int maxIter )
 {
-    std::chrono::time_point<std::chrono::system_clock> start, end;
     std::vector<int> pixels((to-from)*W);
-    start = std::chrono::system_clock::now();
     // On parcourt les pixels de l'espace image :
     for ( int i = from; i < to; ++i ) {
       computeMandelbrotSetRow(W, H, maxIter, i, pixels.data() +((W*(i-from))));
     }
-    end = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end-start;
-    std::cout << "Temps calcul ensemble mandelbrot : " << elapsed_seconds.count() 
-              << std::endl;
-    
+
     return pixels;
 }
 
@@ -154,7 +148,6 @@ int main(int argc, char *argv[] )
     const int maxIter = 8*65536;
 
     std::vector<int> recvbuf;
-    std::vector<int> sendbuf;
 
 
     MPI_Init( &argc, &argv );
@@ -167,13 +160,56 @@ int main(int argc, char *argv[] )
     MPI_Comm_size(globComm, &nbp);
     MPI_Comm_rank(globComm, &rank);
 
+    MPI_Status status;
+
     if(rank==0)
         recvbuf.resize(W*H);
 
-    sendbuf=computeMandelbrotSetFromTo(((rank)*H/nbp),((rank+1)*H)/nbp,W, H, maxIter);
-    
-    MPI_Gather(sendbuf.data(),sendbuf.size(),MPI_INT,recvbuf.data(),sendbuf.size(),MPI_INT,0,globComm);
+    std::chrono::time_point<std::chrono::system_clock> start, end;
+    start = std::chrono::system_clock::now();
 
+    if ( rank == 0 )// rank == 0 => master
+    {
+        int count_task = 0;
+        int nb_tasks=H-1;
+        for ( int i = 1; i < nbp; ++i ) 
+        {
+            MPI_Send(&count_task , 1, MPI_INT, i ,0, globComm);
+            count_task += 1;
+        }
+        while (count_task < nb_tasks) {
+            // status contiendra le numéro du proc ayant envoyé
+            // le résultat . . . : status .MPI_SOURCE en MPI
+            MPI_Recv ( recvbuf.data()+W*count_task , W , MPI_INT, MPI_ANY_SOURCE,0,globComm  , &status );
+            
+            MPI_Send(&count_task , 1, MPI_INT, status.MPI_SOURCE, 0,globComm );
+            count_task += 1;
+        }
+            // On envoie un signal de terminaison à tous les processus
+            count_task = -1;
+        for ( int i = 1; i<nbp; ++i ) MPI_Send(&count_task , 1, MPI_INT, i , 0,globComm );
+    }
+    else if (rank > 0)
+    {// Cas où je suis un travailleur
+        int num_task = 0;
+        // Tant que je ne reçois pas le n° de terminaison
+        while (num_task != -1)
+        {
+            MPI_Recv(&num_task , 1, MPI_INT, 0, 0, globComm, &status );
+            if (num_task >= 0) {
+                // Exécute la tâche correspondant au numéro
+                
+                std::vector<int> result(W);
+                result=computeMandelbrotSetFromTo(num_task,(num_task+1),W, H, maxIter);
+                // Renvoie le résultat avec son numéro
+                MPI_Send( result.data() , W,MPI_INT, 0, 0, globComm );
+            }
+        }
+    }
+    end = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end-start;
+    std::cout << "Temps calcul ensemble mandelbrot : " << elapsed_seconds.count() 
+              << std::endl;
     
     if(rank==0)
         savePicture("mandelbrot.tga", W, H, recvbuf, maxIter);

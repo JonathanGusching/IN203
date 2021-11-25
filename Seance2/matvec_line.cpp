@@ -14,7 +14,7 @@ class Matrix : public std::vector<double>
 public:
     Matrix (int dim);
     Matrix( int nrows, int ncols );
-    Matrix( int nrows, int ncols, int i_start );
+    Matrix( int nrows, int ncols, int j_start );
 
     Matrix( const Matrix& A ) = delete;
     Matrix( Matrix&& A ) = default;
@@ -51,6 +51,7 @@ public:
     }
 private:
     int m_nrows, m_ncols;
+    int offset=0;
     std::vector<double> m_arr_coefs;
 };
 // ---------------------------------------------------------------------
@@ -74,18 +75,15 @@ std::vector<double>
 Matrix::operator * ( const std::vector<double>& u ) const
 {
     const Matrix& A = *this;
-    assert( u.size() == unsigned(m_ncols) );
+    //assert( u.size() == unsigned(m_ncols) );
     std::vector<double> v(m_nrows, 0.);
     for ( int i = 0; i < m_nrows; ++i ) {
         for ( int j = 0; j < m_ncols; ++j ) {
-            v[i] += A(i,j)*u[j];
+            v[i] += A(i,j)*u[offset+j];
         }            
     }
     return v;
 }
-
-
-
 // =====================================================================
 Matrix::Matrix (int dim) : m_nrows(dim), m_ncols(dim),
                            m_arr_coefs(dim*dim)
@@ -108,20 +106,30 @@ Matrix::Matrix( int nrows, int ncols ) : m_nrows(nrows), m_ncols(ncols),
     }    
 }
 // ---------------------------------------------------------------------
-Matrix::Matrix( int nrows, int ncols, int i_start ) : m_nrows(nrows), m_ncols(ncols),
-                                         m_arr_coefs(nrows*ncols)
+Matrix::Matrix( int nrows, int ncols, int j_start ) : m_nrows(nrows), m_ncols(ncols+j_start), offset(j_start),
+                                         m_arr_coefs(nrows*(ncols+j_start))
 {
     int dim = (nrows > ncols ? nrows : ncols );
     for ( int i = 0; i < nrows; ++ i ) {
+        /* Ou bien on remplit les cases inutiles par des zéros pour avoir le décalage
+        for ( int j = 0; j < j_start; ++j ) {
+            (*this)(i,j) = 0; 
+        }
+        for ( int j = j_start; j < j_start+ncols; ++j ) {
+            (*this)(i,j) = (i+j)%dim;
+        }
+        */
+
+        //Ou bien on rajoute un champ à notre classe (moins couteux en mémoire) cf champ privé "offset" et on modifie le produit et la classe
         for ( int j = 0; j < ncols; ++j ) {
-            (*this)(i,j) = (i+i_start+j)%dim;
+            (*this)(i,j) = (i+j_start+j)%dim;
         }
     }    
 }
 // =====================================================================
 int main( int nargs, char* argv[] )
 {
-    const int N = 12;
+    const int N = 120;
     std::vector<double> u( N );
     for ( int i = 0; i < N; ++i ) u[i] = i+1;
     
@@ -139,16 +147,16 @@ int main( int nargs, char* argv[] )
     std::vector<double> final_result;
 
 
-    int nb_row=N/nbp;   
+    int nb_col=N/nbp;   
 
-    Matrix A(nb_row,N,rank*nb_row);
+    Matrix A(N,nb_col,rank*nb_col);
 
     std::vector<double> res={0.};
     res=A*u;
 
     final_result.resize(N);
 
-    MPI_Allgather(res.data(),res.size(),MPI_DOUBLE,final_result.data(),res.size(),MPI_DOUBLE,globComm);
+    MPI_Allreduce(res.data(),final_result.data(),res.size(),MPI_DOUBLE,MPI_SUM,globComm);
 
 
     // pour n'avoir qu'un seul affichage
