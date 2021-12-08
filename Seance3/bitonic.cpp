@@ -8,6 +8,9 @@
 # include <exception>
 # include <chrono>
 # include <stdexcept>
+
+# include <thread>
+
 # include "Vecteur.hpp"
 using namespace Algebra;
 
@@ -43,11 +46,36 @@ namespace Bitonic
     auto second = _sort(false, objs + len/2, len - (len/2));
     return _merge(up, first.first, first.second + second.second );
   }
+
   // --------------------------------------------
   template<typename Obj> std::vector<Obj>&
   sort( bool up, std::vector<Obj>& x )
-  {
-    _sort(up, x.data(), int(x.size()));
+  { 
+  //L'exemple se fait pour 4 threads, mais avec une boucle for, on peut généraliser 
+    std::thread t[4];
+    int len=int(x.size());
+
+    t[0]=std::thread(_sort<Obj>,up, x.data(), len/4);
+    t[1]=std::thread(_sort<Obj>,!up, x.data()+len/4, len/4);
+    t[2]=std::thread(_sort<Obj>,up, x.data()+2*len/4, len/4);
+    t[3]=std::thread(_sort<Obj>,!up, x.data()+3*len/4, len/4);
+
+
+
+    t[0].join();
+    t[1].join();
+    t[2].join();
+    t[3].join();
+    
+    t[0]=std::thread(_merge<Obj>,up,x.data(),len/2);
+    t[1]=std::thread(_merge<Obj>,!up,x.data()+len/2,len/2);
+    
+
+    t[0].join();
+    t[1].join();
+
+    _merge(up,x.data(),len);
+
     return x;
   }  
 }

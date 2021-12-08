@@ -10,6 +10,8 @@
 # include <chrono>
 # include <fstream>
 
+#include <omp.h>
+
 struct Complex
 {
     float re, im;    
@@ -94,16 +96,19 @@ bhuddabrot ( unsigned long nbSamples, unsigned long maxIter, unsigned width, uns
 
     std::cerr << "Computing starting c\n";
     std::vector<unsigned> image(width*height, 0U);
-    for ( unsigned long iSample = 0; iSample < nbSamples; ) {
+    # pragma omp parallel for schedule(static)
+    for ( unsigned long iSample = 0; iSample < nbSamples; iSample++) {
         float r = genNorm();
         float angle = genAngle();
         Complex c{ r * std::cos(angle), r * std::sin(angle) };
         Complex c0{c.re,c.im};
-        if ( test_mandelbrot_divergent( maxIter, c0 ) == true ) {
+        if ( test_mandelbrot_divergent( maxIter, c0 ) == true ) 
+        {
             // Calcul de l'orbite si la suite diverge :
             comp_mandelbrot_orbit( maxIter, c0, width, height, image );
             iSample ++;
         }
+        iSample--;
     }
     return image;
 }

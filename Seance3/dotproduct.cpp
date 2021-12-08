@@ -4,6 +4,8 @@
 # include <iostream>
 # include <chrono>
 
+#include <omp.h>
+
 double dot( std::vector<double>& u, std::vector<double>& v )
 {
   assert(u.size() == v.size());
@@ -17,6 +19,7 @@ double dot( std::vector<double>& u, std::vector<double>& v )
 
 int main( int nargs, char* vargs[])
 {
+  omp_set_num_threads(4);
   std::chrono::time_point<std::chrono::system_clock> start, end;
   int N = 100023;
   int nbSamples =  1024;

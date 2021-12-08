@@ -1,3 +1,3 @@
-CXX = clang++ -fopenmp
-CC  = clang -fopenmp
+CXX = g++ -fopenmp
+CC  = gcc -fopenmp
 LIB = 
