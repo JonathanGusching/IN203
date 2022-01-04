@@ -10,7 +10,7 @@ double dot( std::vector<double>& u, std::vector<double>& v )
 {
   assert(u.size() == v.size());
   double scal = 0.;
-# pragma omp parallel for reduction(+:scal)
+# pragma omp parallel for reduction(+:scal) shared(u, v)
   for ( size_t i = 0; i < u.size(); ++i ) {
     scal += u[i]*v[i];
   }
@@ -19,10 +19,9 @@ double dot( std::vector<double>& u, std::vector<double>& v )
 
 int main( int nargs, char* vargs[])
 {
-  omp_set_num_threads(4);
   std::chrono::time_point<std::chrono::system_clock> start, end;
   int N = 100023;
-  int nbSamples =  1024;
+  int nbSamples =  4112;
   if (nargs > 1) {
     nbSamples = std::stoi(vargs[1]);
   }

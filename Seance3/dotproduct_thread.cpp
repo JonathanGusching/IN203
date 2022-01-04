@@ -16,7 +16,7 @@ void dot_part( const std::vector<double>& u, const std::vector<double>& v,
 }
 double dot( std::vector<double>& u, std::vector<double>& v )
 {
-  int num_threads = 4;//std::thread::hardware_concurrency();
+  int num_threads = 8;//std::thread::hardware_concurrency();
   std::vector<std::thread> threads; threads.reserve(num_threads);
   std::vector<double> partial_sums(num_threads);
   std::size_t dim_loc = u.size()/num_threads;
@@ -44,7 +44,7 @@ int main( int nargs, char* vargs[])
 {
   std::chrono::time_point<std::chrono::system_clock> start, end;
   int N = 100023;
-  int nbSamples = 1024;
+  int nbSamples = 4112;
   if (nargs > 1) {
     nbSamples = std::stoi(vargs[1]);
   }

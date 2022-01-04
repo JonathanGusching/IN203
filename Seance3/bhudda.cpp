@@ -96,7 +96,8 @@ bhuddabrot ( unsigned long nbSamples, unsigned long maxIter, unsigned width, uns
 
     std::cerr << "Computing starting c\n";
     std::vector<unsigned> image(width*height, 0U);
-    # pragma omp parallel for schedule(static)
+    
+    # pragma omp parallel for num_threads(1)
     for ( unsigned long iSample = 0; iSample < nbSamples; iSample++) {
         float r = genNorm();
         float angle = genAngle();
